@@ -14,7 +14,7 @@ let regex_alphanum = /^[A-Za-z0-9]+$/
 
 let cycleRule = /cycle\((.*?),(.*?),(.*?),(.*?)\)/  // cycle(,,,,) with no white spaces for params
 let lockKeyRule = /keylock\((.*?),(.*?),(.*?)\)/    // keylock(keylocation, start, end)
-let tweenRule = /tween\((.*?),(.*?),(.*?)\)/        // tween(new_middle, start, end)
+let tweenRule = /tween\((.*?),(.*?),(.*?)\)/        // tween(start, middle, end)
 
 let keyLocks = {}
 let lockedEdges = {};
@@ -104,7 +104,6 @@ function generateDot(line) {
         }
     }
     else if (tweenRule.test(line)) {
-        // so we need to remove the edge if it exists
         print("tweening")
         let c = 3;
         let n = line.split(',',c)
@@ -112,9 +111,17 @@ function generateDot(line) {
         n[1] = parseParamBody(n[1])
         n[2] = parseParamTail(n[2])
 
-        let start = n[1][0]
+        let start = n[0][0]
         let end = n[2][0]
         removeEdge(social_edges, start, end)
+        let middle = n[1][0]
+
+        // now add new edge from
+        if (!n.includes("")) {
+            addEdge(social_edges, start, middle, n[0][1]);
+            addEdge(social_edges, middle, end, n[1][1]); // make this one transparent ofr now
+        }
+        addEdge
     }
 }
 
@@ -128,6 +135,7 @@ function removeEdge(dict, src, dst) {
         label_arr.splice(idx, 1);
         print(lookup_arr)
         if(lookup_arr.length < 1) delete dict_val
+        // TODO remove from keyLocks
     } 
 }
 
