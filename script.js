@@ -72,6 +72,7 @@ function generateDot(lines) {
     //         }
     //     }
     // }
+    social_edges = []
     let src, dst, label;
     text_lines.forEach(line => {
         let is_valid_rule = false;
@@ -90,7 +91,6 @@ function generateDot(lines) {
     //     dst: j,        
     //     label: rel      
     // });
-    dot_fragments = []
     // CONVERTION TO DOT LANGUAGE
     for (let obj of social_edges) {
         let {src, dst, label} = obj;
@@ -115,6 +115,4 @@ function render() {
 //     div.innerHTML = graphviz.layout(dot, "svg", "dot");
 // });
 }
-
-render();
 
