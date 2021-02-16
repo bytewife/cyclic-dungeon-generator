@@ -72,7 +72,6 @@ function generateDot(line) {
             label = " " + line.split(':', 2)[1].trim();
         }
         src = arr[0], dst = arr[1];
-        print(src)
         addEdge(social_edges, src, dst, label);
     }
     else if (cycleRule.test(line)) {
@@ -91,10 +90,12 @@ function generateDot(line) {
     else if (lockKeyRule.test(line)) {
         let c = 2;
         let n = line.split(',',c)
-        n[0] = parseParamHead(n)
-        n[1] = parseParamTail(n)
+        n[0] = parseParamHead(n[0])
+        n[1] = parseParamTail(n[1])
         if (!n.includes("")) {
             keyLocks[n[0]] = [n[1]]
+        print(n[1])
+            addEdge(social_edges, n[0], n[1], '');
         }
     }
 
@@ -132,15 +133,21 @@ function parseParamBody(n) {
 
 function parseParamTail(n) {
     n = n.substring(0, n.indexOf(')')).replace(/[^0-9A-Za-z ]/, '').trim();
+    print(n)
     return n;
 }
 
 function render() {
     for (let src in social_edges) {
         for(let edge = 0; edge < social_edges[src]["dst"].length; edge++) {
+            let keyUni = '\u26B7 ' // more http://www.unicode.org/charts/PDF/U2600.pdf
             let dst = social_edges[src]["dst"][edge]
             let label = social_edges[src]["label"][edge]
-            dot_fragments.push(` "${src}" -> "${dst}" [label="${label}"]`);
+            let ks = ''
+            if (src in keyLocks) { ks = keyUni }
+            let kd = ''
+            if (dst in keyLocks) { kd = keyUni }
+            dot_fragments.push(` "${ks}${src}" -> "${kd}${dst}" [label="${label}"]`);
         }
     }
 
@@ -151,9 +158,11 @@ function render() {
         const div = document.getElementById("canvasContainer");
         div.innerHTML = svg;
     });
+
+    // RESETTI
     social_edges = {}
     dot_fragments = []
-
+    delete keyLocks
 
     // hpccWasm.graphvizSync().then(graphviz => {
     //     const div = document.getElementById("placeholder2");
