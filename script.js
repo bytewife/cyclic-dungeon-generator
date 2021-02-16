@@ -13,8 +13,9 @@ let arrow = '->'
 let regex_alphanum = /^[A-Za-z0-9]+$/
 
 let cycleRule = /cycle\((.*?),(.*?),(.*?),(.*?)\)/  // cycle(,,,,) with no white spaces for params
-let lockKeyRule = /lock\((.*?),(.*?)\)/
+let lockKeyRule = /keylock\((.*?),(.*?),(.*?)\)/
 let keyLocks = {}
+let lockedEdges = {};
 
 let social_edges = {};  // Looks like { srcname: {dst:[...], label: [...]}, ... }
 
@@ -35,7 +36,7 @@ function reseed() {
 }
 
 function fillGrid(
-    text = "Hero -> Dragon : Fights\nDragon -> Treasure : Guards\ncycle(Hero, Foyer, Dragon, Basement)"
+    text = "Hero -> Dragon : Fights\nDragon -> Treasure : Guards\ncycle(Hero, Foyer, Dragon, Basement)\nkeylock(Basement, Hero, Treasure)"
 ) {
     select("#asciiBox").value(text);
     text_lines.push(text)
@@ -77,25 +78,27 @@ function generateDot(line) {
     else if (cycleRule.test(line)) {
         let c = 4;
         let n = line.split(',',c)
-        n[0] = parseParamHead(n[0])
-        n[1] = parseParamBody(n[1])
-        n[2] = parseParamBody(n[2])
+        n[0] = parseParamHead(n[0]);
+        n[1] = parseParamBody(n[1]);
+        n[2] = parseParamBody(n[2]);
         n[3] = parseParamTail(n[3]);
         if (!n.includes("")) {
-            for(let src = 0; src < c;) {
-                addEdge(social_edges, n[src], n[++src % 4], '');
+            for(let src = 0; src < c; ++src) {
+                addEdge(social_edges, n[src][0], n[(src+1) % 4][0], n[src][1]);
             }
         }
     }
     else if (lockKeyRule.test(line)) {
-        let c = 2;
+        let c = 3;
         let n = line.split(',',c)
         n[0] = parseParamHead(n[0])
-        n[1] = parseParamTail(n[1])
+        n[1] = parseParamBody(n[1])
+        n[2] = parseParamTail(n[2])
         if (!n.includes("")) {
-            keyLocks[n[0]] = [n[1]]
-        print(n[1])
-            addEdge(social_edges, n[0], n[1], '');
+            keyLocks[n[0][0]] = [n[1][0], n[2][0]]
+            lockedEdges[n[1][0]] = n[2][0]
+            addEdge(social_edges, n[0][0], n[1][0], n[0][1]);
+            addEdge(social_edges, n[1][0], n[2][0], n[1][1]); // make this one transparent ofr now
         }
     }
 
@@ -121,20 +124,23 @@ function addEdge(dict, src, dst, label) {
     }
 }
 
+// These parse functions return n, where n[0] is the node name and n[1] is the label/verb
 function parseParamHead(n) {
-    n = n.substring(n.lastIndexOf('('), n.length).replace(/[^0-9A-Za-z ]/, '').trim();
-    return n;
+    n = n.substring(n.lastIndexOf('('), n.length).replace(/[^0-9A-Za-z ]/, '').split(':', 2);
+    if (!n[1]) n[1] = ""
+    return [n[0].trim(), n[1].trim()];
 }
 
 function parseParamBody(n) {
-    n = n.replace(/[^0-9A-Za-z ]/, '').trim()
-    return n;
+    n = n.split(':', 2);
+    if (!n[1]) n[1] = ""
+    return [n[0].replace(/[^0-9A-Za-z ]/, '').trim(), n[1].replace(/[^0-9A-Za-z ]/, '').trim()];
 }
 
 function parseParamTail(n) {
-    n = n.substring(0, n.indexOf(')')).replace(/[^0-9A-Za-z ]/, '').trim();
-    print(n)
-    return n;
+    n = n.substring(0, n.indexOf(')')).replace(/[^0-9A-Za-z ]/, '').split(':', 2);
+    if (!n[1]) n[1] = ""
+    return [n[0].trim(), n[1].trim()];
 }
 
 function render() {
@@ -142,12 +148,17 @@ function render() {
         for(let edge = 0; edge < social_edges[src]["dst"].length; edge++) {
             let keyUni = '\u26B7 ' // more http://www.unicode.org/charts/PDF/U2600.pdf
             let dst = social_edges[src]["dst"][edge]
+
             let label = social_edges[src]["label"][edge]
-            let ks = ''
-            if (src in keyLocks) { ks = keyUni }
-            let kd = ''
-            if (dst in keyLocks) { kd = keyUni }
-            dot_fragments.push(` "${ks}${src}" -> "${kd}${dst}" [label="${label}"]`);
+
+            let ks = ''; if (src in keyLocks) { ks = keyUni }  // If this src has a key
+            let kd = ''; if (dst in keyLocks) { kd = keyUni }
+
+            let sty = ""
+            if (src in lockedEdges && dst == lockedEdges[src]) { // If this edge is a key-lock edge
+                sty = "dashed"; print("here")}
+
+            dot_fragments.push(` "${ks}${src}" -> "${kd}${dst}" [label="${label}" style="${sty}"]`);
         }
     }
 
@@ -162,7 +173,9 @@ function render() {
     // RESETTI
     social_edges = {}
     dot_fragments = []
-    delete keyLocks
+    for (let prop in keyLocks) {
+        delete keyLocks[prop];
+    }
 
     // hpccWasm.graphvizSync().then(graphviz => {
     //     const div = document.getElementById("placeholder2");
