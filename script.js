@@ -62,22 +62,25 @@ function splitByNewline(str) {
 
 function generateDot(lines) {
     social_edges = []
-    let src, dst, label;
     text_lines.forEach(line => {
+        let src, dst, label = "";
         let is_valid_rule = false;
         if (checkIsArrow(line)) {
-            let arr = (line.split(arrow))
+            let arr = (line.split(arrow,2))
             arr[0] = '"' + arr[0].replace( /[^0-9A-Za-z ]/, '').trim() + '"';  // remove non alphanumeric
-            arr[1] = '"' + arr[1].replace( /[^0-9A-Za-z ]/, '').trim() + '"';  // surroundig quotes for multi word
-            print(arr[1])
-            // arr = arr.forEach(word => { word.replace(/[^0-9a-z]/gi, '')});  
+            arr[1] = '"' + arr[1].split(':',1)[0].replace( /[^0-9A-Za-z ]/, '').trim() + '"';  // surroundig quotes for multi word
+            if(/:/.test(line)) {
+                print("line is")
+                print(line)
+                label = line.split(':', 2)[1];
+            }
             src = arr[0], dst = arr[1];
             is_valid_rule = true;
         }
         if(is_valid_rule) social_edges.push({
             src: src,
             dst: dst,
-            label: "friend"
+            label: label
         });
     });
 
