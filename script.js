@@ -6,6 +6,7 @@ let dot;
 let dot_fragments = [];
 let text_lines = [];
 let arrow = '->'
+let regex_alphanum = /^[A-Za-z0-9]+$/
 
 let social_edges = [];
 
@@ -60,24 +61,17 @@ function splitByNewline(str) {
 }
 
 function generateDot(lines) {
-    // for (let i = 0; i < num_people; i++) {
-    //     for (let j = 0; j < num_people; j++) {
-    //         if (Math.random() < 0.005) {
-    //             let rel = rel_types[Math.floor(Math.random() * rel_types.length)];
-    //             social_edges.push({
-    //                 src: i,
-    //                 dst: j,
-    //                 label: rel
-    //             });
-    //         }
-    //     }
-    // }
     social_edges = []
     let src, dst, label;
     text_lines.forEach(line => {
         let is_valid_rule = false;
         if (checkIsArrow(line)) {
-            [src, dst] = (line.split(arrow))
+            let arr = (line.split(arrow))
+            arr[0] = '"' + arr[0].replace( /[^0-9A-Za-z ]/, '').trim() + '"';  // remove non alphanumeric
+            arr[1] = '"' + arr[1].replace( /[^0-9A-Za-z ]/, '').trim() + '"';  // surroundig quotes for multi word
+            print(arr[1])
+            // arr = arr.forEach(word => { word.replace(/[^0-9a-z]/gi, '')});  
+            src = arr[0], dst = arr[1];
             is_valid_rule = true;
         }
         if(is_valid_rule) social_edges.push({
@@ -86,11 +80,7 @@ function generateDot(lines) {
             label: "friend"
         });
     });
-    // social_edges.push({
-    //     src: i,        
-    //     dst: j,        
-    //     label: rel      
-    // });
+
     // CONVERTION TO DOT LANGUAGE
     for (let obj of social_edges) {
         let {src, dst, label} = obj;
