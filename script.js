@@ -15,7 +15,7 @@ let social_edges = {};  // Looks like { srcname: {dst:[...], label: [...]}, ... 
 function setup() {
     numCols = select("#asciiBox").attribute("rows") | 0; // iot grab html element named asciiBox.
     numRows = select("#asciiBox").attribute("cols") | 0; // 'select()' grabs an html element
-    select("#reseedButton").mousePressed(reseed);
+    // select("#reseedButton").mousePressed(reseed);
     select("#asciiBox").input(parseTextForm);
     fillGrid();
     parseTextForm()
@@ -39,14 +39,6 @@ function parseTextForm() {
     text_lines = splitByNewline(select("#asciiBox").value());
     text_lines.forEach(line => { generateDot(line) });
     render();
-}
-
-function gridToString(grid) {
-    let rows = [];
-    for (let i = 0; i < grid.length; i++) {
-        rows.push(grid[i].join(""));
-    }
-    return rows.join("\n");
 }
 
 function checkIsArrow(line) {
@@ -84,7 +76,6 @@ function generateDot(line) {
         n[1] = n[1].replace(/[^0-9A-Za-z ]/, '').trim();
         n[2] = n[2].replace(/[^0-9A-Za-z ]/, '').trim();
         n[3] = n[3].substring(0, n[3].indexOf(')')).replace(/[^0-9A-Za-z ]/, '').trim();
-        print(n)
         if (!n.includes("")) {
             for(let src = 0; src < 4;) {
                 addEdge(social_edges, n[src], n[++src % 4], "");
