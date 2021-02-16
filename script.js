@@ -16,8 +16,8 @@ let cycleRule = /cycle\((.*?),(.*?),(.*?),(.*?)\)/  // cycle(,,,,) with no white
 let lockKeyRule = /keylock\((.*?),(.*?),(.*?)\)/    // keylock(keylocation, start, end)
 let tweenRule = /insert\((.*?),(.*?),(.*?)\)/        // tween(start, middle, end)
 
-let keyLocks = {}
-let lockedEdges = {};
+let keyLocks = {}     // key: key area, value: [door area, locked area]
+let lockedEdges = {}; // key: door area, value: [locked area, key area]
 
 let social_edges = {};  // Looks like { srcname: {dst:[...], label: [...]}, ... }
 
@@ -105,7 +105,7 @@ function generateDot(line) {
         n[2] = parseParamTail(n[2])
         if (!n.includes("")) {
             keyLocks[n[0][0]] = [n[1][0], n[2][0]]
-            lockedEdges[n[1][0]] = n[2][0]
+            lockedEdges[n[1][0]] = [n[2][0], n[0][0]];
             addEdge(social_edges, n[0][0], n[1][0], n[0][1]);
             addEdge(social_edges, n[1][0], n[2][0], n[1][1]); // make this one transparent ofr now
         }
@@ -185,18 +185,22 @@ function render() {
         for(let edge = 0; edge < social_edges[src]["dst"].length; edge++) {
             let keyUni = '\u26B7 ' // more http://www.unicode.org/charts/PDF/U2600.pdf
             let dst = social_edges[src]["dst"][edge]
-            let col = ""
+            let edgecol = ""
+            let keycol = ""
 
             let label = social_edges[src]["label"][edge]
 
-            let ks = ''; if (src in keyLocks) { ks = keyUni }  // If this src has a key
-            let kd = ''; if (dst in keyLocks) { kd = keyUni }
+            let ks = ''; if (src in keyLocks) { ks = keyUni; keycol = hashStringToColor(src);}  // If this src has a key
+            let kd = ''; if (dst in keyLocks) { kd = keyUni; }
 
             let sty = ""
-            if (src in lockedEdges && dst == lockedEdges[src])  // If this edge is a key-lock edge
-                { sty = "dashed"; col = "grey"}
+            if (src in lockedEdges && dst == lockedEdges[src][0])  // If this edge is a key-lock edge
+                { sty = "dashed"; edgecol = hashStringToColor(lockedEdges[src][1]);}
 
-            dot_fragments.push(` "${ks}${src}" -> "${kd}${dst}" [label="${label}" style="${sty}" color="${col}"]`);
+            dot_fragments.push(` "${ks}${src}" -> "${kd}${dst}" [label="${label}" style="${sty}" color="#${edgecol}"]`);
+            if (ks != '') {
+                dot_fragments.push(` "${ks}${src}" [ fillcolor="#${keycol}"   style=filled                  ]`);
+            }
         }
     }
 
@@ -225,3 +229,20 @@ function render() {
     // });
 }
 
+// For converting string to color https://stackoverflow.com/questions/3426404/create-a-hexadecimal-colour-based-on-a-string-with-javascript
+function hashStringToColor(str) { 
+    var hash = 0;
+    for (var i = 0; i < str.length; i++) {
+       hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    function intToRGB(i){
+        var c = (i & 0x00FFFFFF)
+            .toString(16)
+            .toUpperCase();
+
+        return "00000".substring(0, 6 - c.length) + c;
+    }
+
+    return intToRGB(hash);
+}
