@@ -28,7 +28,9 @@ function reseed() {
     select("#seedReport").html("seed " + seed);
 }
 
-function fillGrid(text = "Hero -> Dragon : Fights\nDragon -> Treasure : Guards") {
+function fillGrid(
+    text = "Hero -> Dragon : Fights\nDragon -> Treasure : Guards\ncycle(Hero, Foyer, Dragon, Basement)"
+) {
     select("#asciiBox").value(text);
     text_lines.push(text)
 }
@@ -77,7 +79,6 @@ function generateDot(line) {
         is_valid_rule = true;
     }
     else if (cycleRule.test(line)) {
-        print("hehe")
         let n = line.split(',',4)
         n[0] = n[0].substring(n[0].lastIndexOf('('), n[0].length).replace(/[^0-9A-Za-z ]/, '').trim();
         n[1] = n[1].replace(/[^0-9A-Za-z ]/, '').trim();
@@ -85,7 +86,6 @@ function generateDot(line) {
         n[3] = n[3].substring(0, n[3].indexOf(')')).replace(/[^0-9A-Za-z ]/, '').trim();
         print(n)
         if (!n.includes("")) {
-            print("behold")
             for(let src = 0; src < 4;) {
                 addEdge(social_edges, n[src], n[++src % 4], "");
             }
@@ -93,7 +93,6 @@ function generateDot(line) {
         // add an edge from a to b to c to d
     }
     if (is_valid_rule) addEdge(social_edges, src, dst, label);
-    // print(social_edges)
     // CONVERTION TO DOT LANGUAGE
 }
 
