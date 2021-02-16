@@ -4,6 +4,8 @@ const rel_types = ["friend", "lover", "enemy"];
 let seed;
 let dot;
 let dot_fragments = [];
+let text_lines = [];
+let arrow = '->'
 
 let social_edges = [];
 
@@ -11,9 +13,9 @@ function setup() {
   numCols = select("#asciiBox").attribute("rows") | 0; // iot grab html element named asciiBox.
   numRows = select("#asciiBox").attribute("cols") | 0; // 'select()' grabs an html element
   select("#reseedButton").mousePressed(reseed);
-  select("#asciiBox").input(reparseGrid); // iot run reparseGrid as a callback to asciiBox's input being changed
-  generateDot()
-  render()
+  select("#asciiBox").input(parseTextForm);
+  generateDot();
+  render();
 }
 
 function reseed() {
@@ -25,11 +27,15 @@ function reseed() {
 
 function regenerateGrid() {
   select("#asciiBox").value(gridToString(generateGrid(numCols, numRows)));
-  reparseGrid();
+  parseTextForm();
 }
 
-function reparseGrid() {
-    print(stringToGrid(select("#asciiBox").value()));
+function parseTextForm() {
+    text_lines = splitByNewline(select("#asciiBox").value());
+    // print(text_lines)
+    // print(checkIsArrow(text_lines[0]))
+    generateDot();
+    render();
 }
 
 function gridToString(grid) {
@@ -40,34 +46,51 @@ function gridToString(grid) {
   return rows.join("\n");
 }
 
-function stringToGrid(str) {
-  let grid = [];
-  let lines = str.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    let row = [];
-    let chars = lines[i].split("");
-    for (let j = 0; j < chars.length; j++) {
-      row.push(chars[j]);
+function checkIsArrow(line) {
+    let re = new RegExp(arrow)
+    if (re.test(line)) {
+        let lenCheckArr = line.split(arrow)
+        return lenCheckArr[0].trim() != "" && lenCheckArr[1].trim() != ""
     }
-    grid.push(row);
-  }
-  return grid;
 }
 
-function generateDot() {
-    for (let i = 0; i < num_people; i++) {
-        for (let j = 0; j < num_people; j++) {
-            if (Math.random() < 0.1) {
-                let rel = rel_types[Math.floor(Math.random() * rel_types.length)];
-                social_edges.push({
-                    src: i,
-                    dst: j,
-                    label: rel
-                });
-            }
-        }
-    }
+function splitByNewline(str) {
+  let lines = str.split("\n");
+  return lines;
+}
 
+function generateDot(lines) {
+    // for (let i = 0; i < num_people; i++) {
+    //     for (let j = 0; j < num_people; j++) {
+    //         if (Math.random() < 0.005) {
+    //             let rel = rel_types[Math.floor(Math.random() * rel_types.length)];
+    //             social_edges.push({
+    //                 src: i,
+    //                 dst: j,
+    //                 label: rel
+    //             });
+    //         }
+    //     }
+    // }
+    let src, dst, label;
+    text_lines.forEach(line => {
+        let is_valid_rule = false;
+        if (checkIsArrow(line)) {
+            [src, dst] = (line.split(arrow))
+            is_valid_rule = true;
+        }
+        if(is_valid_rule) social_edges.push({
+            src: src,
+            dst: dst,
+            label: "friend"
+        });
+    });
+    // social_edges.push({
+    //     src: i,        
+    //     dst: j,        
+    //     label: rel      
+    // });
+    dot_fragments = []
     // CONVERTION TO DOT LANGUAGE
     for (let obj of social_edges) {
         let {src, dst, label} = obj;
@@ -83,12 +106,15 @@ function render() {
         const div = document.getElementById("canvasContainer");
         div.innerHTML = svg;
     });
-}
+    dot_fragments = []
 
-render();
 
 // hpccWasm.graphvizSync().then(graphviz => {
 //     const div = document.getElementById("placeholder2");
 //     // Synchronous call to layout
 //     div.innerHTML = graphviz.layout(dot, "svg", "dot");
 // });
+}
+
+render();
+
