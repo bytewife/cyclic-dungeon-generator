@@ -13,7 +13,9 @@ let arrow = '->'
 let regex_alphanum = /^[A-Za-z0-9]+$/
 
 let cycleRule = /cycle\((.*?),(.*?),(.*?),(.*?)\)/  // cycle(,,,,) with no white spaces for params
-let lockKeyRule = /keylock\((.*?),(.*?),(.*?)\)/
+let lockKeyRule = /keylock\((.*?),(.*?),(.*?)\)/    // keylock(keylocation, start, end)
+let tweenRule = /tween\((.*?),(.*?),(.*?)\)/        // tween(new_middle, start, end)
+
 let keyLocks = {}
 let lockedEdges = {};
 
@@ -101,7 +103,32 @@ function generateDot(line) {
             addEdge(social_edges, n[1][0], n[2][0], n[1][1]); // make this one transparent ofr now
         }
     }
+    else if (tweenRule.test(line)) {
+        // so we need to remove the edge if it exists
+        print("tweening")
+        let c = 3;
+        let n = line.split(',',c)
+        n[0] = parseParamHead(n[0])
+        n[1] = parseParamBody(n[1])
+        n[2] = parseParamTail(n[2])
 
+        let start = n[1][0]
+        let end = n[2][0]
+        removeEdge(social_edges, start, end)
+    }
+}
+
+function removeEdge(dict, src, dst) {
+    let dict_val = dict[src]
+    let lookup_arr = dict_val["dst"]
+    if(dict_val && lookup_arr.indexOf(dst) != -1) {  // Check if edge is in given location
+        let idx = lookup_arr.indexOf(dst)
+        lookup_arr.splice(idx, 1);
+        let label_arr = dict_val["label"]
+        label_arr.splice(idx, 1);
+        print(lookup_arr)
+        if(lookup_arr.length < 1) delete dict_val
+    } 
 }
 
 function addEdge(dict, src, dst, label) {
@@ -148,6 +175,7 @@ function render() {
         for(let edge = 0; edge < social_edges[src]["dst"].length; edge++) {
             let keyUni = '\u26B7 ' // more http://www.unicode.org/charts/PDF/U2600.pdf
             let dst = social_edges[src]["dst"][edge]
+            let col = ""
 
             let label = social_edges[src]["label"][edge]
 
@@ -155,10 +183,10 @@ function render() {
             let kd = ''; if (dst in keyLocks) { kd = keyUni }
 
             let sty = ""
-            if (src in lockedEdges && dst == lockedEdges[src]) { // If this edge is a key-lock edge
-                sty = "dashed"; print("here")}
+            if (src in lockedEdges && dst == lockedEdges[src])  // If this edge is a key-lock edge
+                { sty = "dashed"; col = "grey"}
 
-            dot_fragments.push(` "${ks}${src}" -> "${kd}${dst}" [label="${label}" style="${sty}"]`);
+            dot_fragments.push(` "${ks}${src}" -> "${kd}${dst}" [label="${label}" style="${sty}" color="${col}"]`);
         }
     }
 
@@ -175,6 +203,9 @@ function render() {
     dot_fragments = []
     for (let prop in keyLocks) {
         delete keyLocks[prop];
+    }
+    for (let prop in lockedEdges) {
+        delete lockedEdges[prop];
     }
 
     // hpccWasm.graphvizSync().then(graphviz => {
