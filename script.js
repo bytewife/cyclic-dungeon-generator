@@ -14,7 +14,7 @@ let regex_alphanum = /^[A-Za-z0-9]+$/
 
 let cycleRule = /cycle\((.*?),(.*?),(.*?),(.*?)\)/  // cycle(,,,,) with no white spaces for params
 let lockKeyRule = /keylock\((.*?),(.*?),(.*?)\)/    // keylock(keylocation, start, end)
-let tweenRule = /tween\((.*?),(.*?),(.*?)\)/        // tween(start, middle, end)
+let tweenRule = /insert\((.*?),(.*?),(.*?)\)/        // tween(start, middle, end)
 
 let keyLocks = {}
 let lockedEdges = {};
@@ -37,10 +37,16 @@ function reseed() {
     select("#seedReport").html("seed " + seed);
 }
 
+let sampleText = '\
+Hero -> Village : Sidle back\n\
+Dragon -> Treasure : Guards\n\
+cycle(Hero, Cave, Dragon, Basement)\n\
+keylock(Basement, Hero, Treasure)\ninsert(Hero, Rival Encounter, Cave)\
+';
 function fillGrid(
-    text = "Hero -> Dragon : Fights\nDragon -> Treasure : Guards\ncycle(Hero, Foyer, Dragon, Basement)\nkeylock(Basement, Hero, Treasure)"
+    text = ""
 ) {
-    select("#asciiBox").value(text);
+    select("#asciiBox").value(text = sampleText);
     text_lines.push(text)
 }
 
@@ -65,6 +71,7 @@ function splitByNewline(str) {
 
 function generateDot(line) {
     let src, dst, label = "";
+    if (line && line[0] == '#') return;
     if (checkIsArrow(line)) {
         // GET SRC & DST (->)
         let arr = (line.split(arrow, 2))
@@ -104,7 +111,6 @@ function generateDot(line) {
         }
     }
     else if (tweenRule.test(line)) {
-        print("tweening")
         let c = 3;
         let n = line.split(',',c)
         n[0] = parseParamHead(n[0])
@@ -115,13 +121,10 @@ function generateDot(line) {
         let end = n[2][0]
         removeEdge(social_edges, start, end)
         let middle = n[1][0]
-
-        // now add new edge from
         if (!n.includes("")) {
             addEdge(social_edges, start, middle, n[0][1]);
             addEdge(social_edges, middle, end, n[1][1]); // make this one transparent ofr now
         }
-        addEdge
     }
 }
 
@@ -133,7 +136,6 @@ function removeEdge(dict, src, dst) {
         lookup_arr.splice(idx, 1);
         let label_arr = dict_val["label"]
         label_arr.splice(idx, 1);
-        print(lookup_arr)
         if(lookup_arr.length < 1) delete dict_val
         // TODO remove from keyLocks
     } 
