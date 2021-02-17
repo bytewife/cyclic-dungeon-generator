@@ -1,5 +1,7 @@
 // TODO
-// Variable cycle num
+// - randomly insert rules
+// - get a training set of data to put into words
+// 
 // https://renenyffenegger.ch/notes/index.html
 
 // Graphviz tools https://renenyffenegger.ch/notes/tools/Graphviz/examples/index
@@ -73,21 +75,9 @@ function fillGrid(
 }
 
 function parseTextForm() {
-    text_lines = splitByNewline(select("#asciiBox").value());
+    text_lines = select("#asciiBox").value().split("\n");
     text_lines.forEach(line => { generateDot(line) });
     render();
-}
-
-function checkIsArrow(line) {
-    if (/->/.test(line)) {
-        let lenCheckArr = line.split("->")
-        return lenCheckArr[0].trim() != "" && lenCheckArr[1].trim() != ""
-    }
-}
-
-function splitByNewline(str) {
-    let lines = str.split("\n");
-    return lines;
 }
 
 function generateDot(line) {
