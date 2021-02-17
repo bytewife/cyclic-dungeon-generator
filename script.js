@@ -21,7 +21,7 @@ let rules_dict = {
         
     },
     cycle: {
-        regex: /cycle\((.*?),(.*?),(.*?),(.*?)\)/,
+        regex: /cycle\((.+?),(.+?)((,(.+?))*)\)/,
         count: 4,
         function: cycle // cycle(,,,,) with no white spaces for params
     },
@@ -114,19 +114,18 @@ function arrow(line) {
 }
 
 function cycle(line) {
+    print("cycling")
     let c = 4
-    let n = line.split(',', c)
+    let n = line.split(',')
     let len = n.length;
-    // n[0].Parse
-    // for(let )
     n[0] = parseParamHead(n[0]);
-    n[1] = parseParamBody(n[1]);
-    n[2] = parseParamBody(n[2]);
-    n[3] = parseParamTail(n[3]);
+    for(let i = 1; i < len-1; ++i) {
+        n[i] = parseParamBody(n[i]);
+    }
+    n[len-1] = parseParamBody(n[len-1]);
     if (!n.includes("")) {
-        for(let src = 0; src < c; ++src) {
-            // TODO cehck for empty
-            addEdge(social_edges, n[src][0], n[(src+1) % 4][0], n[src][1]);
+        for(let src = 0; src < len; ++src) {
+            addEdge(social_edges, n[src][0], n[(src+1) % len][0], n[src][1]);
         }
     }
 }
