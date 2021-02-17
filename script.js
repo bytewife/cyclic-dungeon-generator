@@ -13,29 +13,57 @@ let text_lines = [];
 // let alphanum = /^[A-Za-z0-9]+$/
 let alphanum = /[^0-9A-Za-z ]/  // actually this is non alphanum
 
-let rules_names = ["cycle", "lockkey", "wedge"]
-
 let rules_dict = {
     arrow: {
         regex: /->/,
-        count: 2,
-        function: arrow
-        
+        args: 2,
+        function: arrow,
+        template: (arr) => { return `${arr[0]} -> ${arr[1]}`; }
     },
     cycle: {
-        regex: /cycle\((.+?),(.+?)((,(.+?))*)\)/,
-        count: 4,
-        function: cycle // cycle(,,,,) with no white spaces for params
+        regex: /cycle\((.+?),(.+?)((,(.+?))*)\)/, // cycle(,,,,) with no white spaces for params
+        args: -1,
+        function: cycle, 
+        template: (arr) => {
+            if(arr.length == 0) return "";
+            let ret = 'cycle('
+            ret += `${arr[0]}`
+            for(let i=1; i < arr.length;++i) {
+                ret += `, ${arr[i]}`
+            }
+            ret += `)`
+            return ret;
+        }
     },
     keylock: {
-        regex: /keylock\((.*?),(.*?),(.*?)\)/,
-        count: 3,
-        function: keylock // keylock(keylocation, start, end)
+        regex: /keylock\((.*?),(.*?),(.*?)\)/,  // keylock(keylocation, start, end)
+        args: 3,
+        function: keylock,
+        template: (arr) => {
+            if(arr.length != 3) return "";
+            let ret = 'keylock('
+            ret += `${arr[0]}`
+            for(let i=1; i < arr.length;++i) {
+                ret += `, ${arr[i]}`
+            }
+            ret += `)`
+            return ret;
+        }
     },
     wedge: {
-        regex: /wedge\((.*?),(.*?),(.*?)\)/,
-        count: 3,
-        function: wedge  // tween(start, middle, end)
+        regex: /wedge\((.*?),(.*?),(.*?)\)/,  // wedge(start, middle, end)
+        args: 3,
+        function: wedge,  
+        template: (arr) => {
+            if(arr.length != 3) return "";
+            let ret = 'wedge('
+            ret += `${arr[0]}`
+            for(let i=1; i < arr.length;++i) {
+                ret += `, ${arr[i]}`
+            }
+            ret += `)`
+            return ret;
+        }
     }
 }
 
@@ -51,6 +79,7 @@ function setup() {
     select("#asciiBox").input(parseTextForm);
     fillGrid();
     parseTextForm()
+    
 }
 
 function reseed() {
@@ -70,6 +99,7 @@ wedge(Hero:Duels, Rival, Cave)\
 function fillGrid(
     text = ""
 ) {
+    sampleText = generateText(3);
     select("#asciiBox").value(text = sampleText);
     text_lines.push(text)
 }
@@ -89,6 +119,27 @@ function generateDot(line) {
     }
 }
 
+let wordPool = ["a", "b", "c", "d", "e", "f"]
+function generateText(amt) {
+    noiseSeed(1)
+    let ret = '';
+    let keys = Object.keys(rules_dict);
+    let len = keys.length
+    for(let line=0; line<0; ++line) {
+        let idx = random(0, len) | 0;
+        let key = keys[idx]
+        let args = []
+        let argc = rules_dict[key]["args"]
+        argc = argc == -1 ? random(3,6) | 0 : argc;
+        for (let word=0; word < argc; ++word) {
+            let w = random(0, wordPool.length) | 0;
+            args.push(wordPool[w])
+        }
+        ret += rules_dict[key]["template"](args) + "\n"
+    }
+    return ret;
+}
+
 function arrow(line) {
     let src, dst, label = ""
     let arr = (line.split("->", 2))
@@ -99,12 +150,10 @@ function arrow(line) {
         label = " " + line.split(':', 2)[1].trim();
     }
     src = arr[0], dst = arr[1];
-    print(label)
     addEdge(social_edges, src, dst, label);
 }
 
 function cycle(line) {
-    print("cycling")
     let c = 4
     let n = line.split(',')
     let len = n.length;
@@ -135,7 +184,6 @@ function keylock(line) {
 }
 
 function wedge(line) {
-    print("wedging")
     let c = 3;
     let n = line.split(',',c)
     n[0] = parseParamHead(n[0])
@@ -215,16 +263,17 @@ function render() {
 
             let label = social_edges[src]["label"][edge]
 
-            let ks = ''; if (src in keyLocks) { ks = keyUni; keycol = hashStringToColor(src);}  // If this src has a key
+            let ks = ''; if (src in keyLocks) { ks = keyUni; keycol = hashStringToColor(src); }  // If this src has a key
             let kd = ''; if (dst in keyLocks) { kd = keyUni; }
 
             let sty = ""
             if (src in lockedEdges && dst == lockedEdges[src][0])  // If this edge is a key-lock edge
                 { sty = "dashed"; edgecol = hashStringToColor(lockedEdges[src][1]); }
 
-            dot_fragments.push(` "${ks}${src}" -> "${kd}${dst}" [label="${label}" style="${sty}" color="#${edgecol}"]`);
+            dot_fragments.push(` "${ks}${src}" -> "${kd}${dst}" [label="${label}" style="${sty}" color="${edgecol}"]`);
             if (ks != '') {
-                dot_fragments.push(` "${ks}${src}" [ fillcolor="#${keycol}"   style=filled]`);  // Changes node color if it contains key
+                print(keycol)
+                dot_fragments.push(` "${ks}${src}" [ fillcolor="${keycol}"   style=filled]`);  // Changes node color if it contains key
             }
         }
     }
@@ -258,18 +307,21 @@ function render() {
 
 // For converting string to color https://stackoverflow.com/questions/3426404/create-a-hexadecimal-colour-based-on-a-string-with-javascript
 function hashStringToColor(str) { 
-    var hash = 0;
-    for (var i = 0; i < str.length; i++) {
-       hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
+    let h = noise(hashfunc(str, false, 0));
+    let s = 0.800;
+    let v = 0.999
+    let ret = ""+h+ " "+s+" "+v
+    return ret
+}
 
-    function intToRGB(i){
-        var c = (i & 0x00FFFFFF)
-            .toString(16)
-            .toUpperCase();
-
-        return "00000".substring(0, 6 - c.length) + c;
-    }
-
-    return intToRGB(hash);
+function hashfunc(str, asString, seed) {
+    /*jshint bitwise:false */
+    var i, l, hval = (seed === undefined) ? 0x811c9dc5 : seed;
+    for (i = 0, l = str.length; i < l; i++) {
+        hval ^= str.charCodeAt(i);
+        hval += (hval << 1) + (hval << 4) + (hval << 7) + (hval << 8) + (hval << 24);
+    } if( asString ){
+        // Convert to 8 digit hex string
+        return ("0000000" + (hval >>> 0).toString(16)).substr(-8);
+    } return hval >>> 0;
 }
