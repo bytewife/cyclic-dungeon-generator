@@ -1,5 +1,5 @@
 // TODO
-// - randomly insert rules
+// rule weights
 // - get a training set of data to put into words
 // 
 // https://renenyffenegger.ch/notes/index.html
@@ -18,7 +18,8 @@ let rules_dict = {
         regex: /->/,
         args: 2,
         function: arrow,
-        template: (arr) => { return `${arr[0]} -> ${arr[1]}`; }
+        template: (arr) => { return `${arr[0]} -> ${arr[1]}`; },
+        weight: 40
     },
     cycle: {
         regex: /cycle\((.+?),(.+?)((,(.+?))*)\)/, // cycle(,,,,) with no white spaces for params
@@ -33,7 +34,9 @@ let rules_dict = {
             }
             ret += `)`
             return ret;
-        }
+        },
+        weight: 20
+
     },
     keylock: {
         regex: /keylock\((.*?),(.*?),(.*?)\)/,  // keylock(keylocation, start, end)
@@ -48,7 +51,8 @@ let rules_dict = {
             }
             ret += `)`
             return ret;
-        }
+        },
+        weight: 20
     },
     wedge: {
         regex: /wedge\((.*?),(.*?),(.*?)\)/,  // wedge(start, middle, end)
@@ -63,7 +67,8 @@ let rules_dict = {
             }
             ret += `)`
             return ret;
-        }
+        },
+        weight: 30
     }
 }
 
@@ -73,6 +78,7 @@ let lockedEdges = {}; // key: door area, value: [locked area, key area]
 let social_edges = {};  // Looks like { srcname: {dst:[...], label: [...]}, ... }
 
 function setup() {
+    reseed();
     numCols = select("#asciiBox").attribute("rows") | 0; // iot grab html element named asciiBox.
     numRows = select("#asciiBox").attribute("cols") | 0; // 'select()' grabs an html element
     // select("#reseedButton").mousePressed(reseed);
@@ -99,6 +105,7 @@ wedge(Hero:Duels, Rival, Cave)\
 function fillGrid(
     text = ""
 ) {
+    //sum weights
     sampleText = generateText(3);
     select("#asciiBox").value(text = sampleText);
     text_lines.push(text)
@@ -119,14 +126,26 @@ function generateDot(line) {
     }
 }
 
-let wordPool = ["a", "b", "c", "d", "e", "f"]
+let wordPool = ["a", "b", "c", "d"]
 function generateText(amt) {
     noiseSeed(1)
     let ret = '';
     let keys = Object.keys(rules_dict);
     let len = keys.length
-    for(let line=0; line<0; ++line) {
+    let keyLocations = {}
+    let lockLocations = {}
+    let tries = 0;
+
+    let weight_sum = 0;
+    for (rule in rules_dict) {
+        weight_sum += rules_dict[rule]["weight"];
+    }
+    print(weight_sum)
+
+    for(let line=0; line<amt; ++line) {
+        if (tries > 100) return;
         let idx = random(0, len) | 0;
+        idx = 2
         let key = keys[idx]
         let args = []
         let argc = rules_dict[key]["args"]
@@ -135,6 +154,20 @@ function generateText(amt) {
             let w = random(0, wordPool.length) | 0;
             args.push(wordPool[w])
         }
+        // Generation rules
+        ++tries;
+        if(key == 'keylock') {
+            if(args[0] in keyLocations ||
+               (args[1] in lockLocations) && lockLocations[args[1]].indexOf(args[2]) != -1
+            ) {
+                --line; print("redo"); continue; }  // Duplicate Key Area
+            else {
+                keyLocations[args[0]] = true;
+                if(!lockLocations[args[1]]) lockLocations[args[1]] = []
+                lockLocations[args[1]].push(args[2])
+            }
+        }
+
         ret += rules_dict[key]["template"](args) + "\n"
     }
     return ret;
@@ -176,8 +209,13 @@ function keylock(line) {
     n[1] = parseParamBody(n[1])
     n[2] = parseParamTail(n[2])
     if (!n.includes("")) {
-        keyLocks[n[0][0]] = [n[1][0], n[2][0]]
-        lockedEdges[n[1][0]] = [n[2][0], n[0][0]];
+        if(!keyLocks[n[0][0]]) keyLocks[n[0][0]] = []
+        keyLocks[n[0][0]].push([n[1][0], n[2][0]])
+
+        if(!lockedEdges[n[1][0]]) lockedEdges[n[1][0]] = []
+        // lockedEdges[n[1][0]].push([n[2][0]]);
+        lockedEdges[n[1][0]].push([n[2][0], n[0][0]]);
+
         addEdge(social_edges, n[0][0], n[1][0], n[0][1]);
         addEdge(social_edges, n[1][0], n[2][0], n[1][1]); // make this one transparent ofr now
     }
@@ -264,15 +302,20 @@ function render() {
             let label = social_edges[src]["label"][edge]
 
             let ks = ''; if (src in keyLocks) { ks = keyUni; keycol = hashStringToColor(src); }  // If this src has a key
-            let kd = ''; if (dst in keyLocks) { kd = keyUni; }
+            let kd = ''; if (dst in keyLocks) { kd = keyUni; }  // just adds key character to pointed-to node
 
             let sty = ""
-            if (src in lockedEdges && dst == lockedEdges[src][0])  // If this edge is a key-lock edge
-                { sty = "dashed"; edgecol = hashStringToColor(lockedEdges[src][1]); }
+            if (src in lockedEdges) { // If this edge is a key-lock edge
+                for(let a=0; a<lockedEdges[src].length; a++) {  // search through each lock edge using as a door
+                    if(lockedEdges[src][a][0] == dst) {
+                        sty = "dashed"; edgecol = hashStringToColor(lockedEdges[src][a][1]);  // hash the key location
+                        break;
+                    }
+                }
+            }
 
             dot_fragments.push(` "${ks}${src}" -> "${kd}${dst}" [label="${label}" style="${sty}" color="${edgecol}"]`);
             if (ks != '') {
-                print(keycol)
                 dot_fragments.push(` "${ks}${src}" [ fillcolor="${keycol}"   style=filled]`);  // Changes node color if it contains key
             }
         }
