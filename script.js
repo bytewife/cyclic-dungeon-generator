@@ -114,15 +114,18 @@ function arrow(line) {
 }
 
 function cycle(line) {
-    // TODO variable number
-    let c = 4;
-    let n = line.split(',',c)
+    let c = 4
+    let n = line.split(',', c)
+    let len = n.length;
+    // n[0].Parse
+    // for(let )
     n[0] = parseParamHead(n[0]);
     n[1] = parseParamBody(n[1]);
     n[2] = parseParamBody(n[2]);
     n[3] = parseParamTail(n[3]);
     if (!n.includes("")) {
         for(let src = 0; src < c; ++src) {
+            // TODO cehck for empty
             addEdge(social_edges, n[src][0], n[(src+1) % 4][0], n[src][1]);
         }
     }
@@ -143,6 +146,7 @@ function keylock(line) {
 }
 
 function wedge(line) {
+    print("wedging")
     let c = 3;
     let n = line.split(',',c)
     n[0] = parseParamHead(n[0])
@@ -161,8 +165,9 @@ function wedge(line) {
 
 function removeEdge(dict, src, dst) {
     let dict_val = dict[src]
+    if(!dict_val) return;
     let lookup_arr = dict_val["dst"]
-    if(dict_val && lookup_arr.indexOf(dst) != -1) {  // Check if edge is in given location
+    if(lookup_arr && lookup_arr.indexOf(dst) != -1) {  // Check if edge is in given location
         let idx = lookup_arr.indexOf(dst)
         lookup_arr.splice(idx, 1);
         let label_arr = dict_val["label"]
