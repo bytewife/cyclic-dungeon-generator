@@ -1,7 +1,8 @@
 // TODO
 // clean up rules
-// - Figure out how to store the generation rules. Adjacency List? How to get past issue of the key room being unreachable- I think you need to make it so that each rule has one node that's in-use (like a hook)
+// - graph traversal until homa can be reached
 // - add generation rule of every generation needs a start, and a goal
+// - how can I write a grammar that's cleaner?
 // 
 // https://renenyffenegger.ch/notes/index.html
 
@@ -20,11 +21,13 @@ let rules_dict = {
         args: 2,
         function: arrow,
         template: (arr) => { return `${arr[0]} -> ${arr[1]}`; },
-        weight: 40
+        weight: 40,
+        insert_open_pos: [0],
+        unseen_to_open_pos: [1]
     },
     cycle: {
         regex: /cycle\((.+?),(.+?)((,(.+?))*)\)/, // cycle(,,,,) with no white spaces for params
-        args: -1,
+        args: 4,  // but user can input as many as they'd like
         function: cycle, 
         template: (arr) => {
             if(arr.length == 0) return "";
@@ -36,8 +39,10 @@ let rules_dict = {
             ret += `)`
             return ret;
         },
-        weight: 20
-
+        weight: 20,
+        open_pos: 0,
+        insert_open_pos: [0],
+        unseen_to_open_pos: [1, 3]
     },
     keylock: {
         regex: /keylock\((.*?),(.*?),(.*?)\)/,  // keylock(keylocation, start, end)
@@ -53,7 +58,9 @@ let rules_dict = {
             ret += `)`
             return ret;
         },
-        weight: 20
+        weight: 20,
+        insert_open_pos: [0],
+        unseen_to_open_pos: [1]
     },
     wedge: {
         regex: /wedge\((.*?),(.*?),(.*?)\)/,  // wedge(start, middle, end)
@@ -69,7 +76,9 @@ let rules_dict = {
             ret += `)`
             return ret;
         },
-        weight: 30
+        weight: 30,
+        insert_open_pos: [0],
+        unseen_to_open_pos: [1]  // aka expansion slots
     }
 }
 
@@ -109,6 +118,7 @@ wedge(Hero:Duels, Rival, Cave)\
 function fillTextForm(
     text = ""
 ) {
+    inputText = generateText(4);  // DEBUG
     select("#asciiBox").value(text = inputText);
 }
 
@@ -127,67 +137,149 @@ function generateDot(line) {
     }
 }
 
-let wordPool = ["Cave", "Home", "Dark Castle", "Woods", "River", "Treasure"]
+let wordPool = ["Cave", "Home", "Dark Castle", "Woods", "River", "Forest", "Volcano"]
+let open = ["Cave"]
+let unseen = wordPool.filter(function(x) { return open.indexOf(x) < 0 })  // not fast but its readable
+let closed = ["Treasure"]
+
 function generateText(amt) {
     let ret = '';
     let keys = Object.keys(rules_dict);
-    let len = keys.length
-    let keyLocations = {}
-    let lockLocations = {}
-    let tries = 0;
+    let keyslen = keys.length
 
     let weight_sum = 0;
     for (rule in rules_dict) {
         weight_sum += rules_dict[rule]["weight"];
     }
 
-    let idx;
-    let keep_idx = false;
-    let key;
-    for(let line=0; line<amt; ++line) {
-        if (tries > 100) { print("ran out of tries"); return;}
+    for (let line = 0, tries = 0;
+         line < amt && open.length > 0 && tries < 100;
+         line++) {
+        // PICK RULE
+        let idx = random(0, keyslen) | 0;
+        let key = 0;
+        for(let sum = 0, weight = 0; sum < weight_sum; idx = idx++ % (keyslen)) {
+            key = keys[idx]
+            weight += rules_dict[key]["weight"]
+            if(weight > weight_sum) break;
+        }
 
-        if(!keep_idx){
-            idx = random(0, len) | 0;
-            for(let sum = 0, weight = 0; sum < weight_sum; idx = idx++ % (len)) {
-                key = keys[idx]
-                weight += rules_dict[key]["weight"]
-                if(weight > weight_sum) break;
+        // Generate empty array
+        let args = new Array(rules_dict[key]["args"]);
+
+        // Fill the non-terminals
+        let chosenOpen = []
+        for(index in rules_dict[key]["insert_open_pos"]) {
+            let open_element = open.shift()
+            args[index] = open_element; // pick an open elemnt
+            chosenOpen.push(open_element)
+        }
+
+        let chosenUnseen = [];
+        // Expand with new opens from unseen
+        for(index of rules_dict[key]["unseen_to_open_pos"]) {
+            if(unseen.length > 0){
+                let unseen_index = random(0, unseen.length) | 0;
+                let unseen_element = unseen[unseen_index]
+                print("unseen element is "+unseen_element)
+                chosenUnseen.push(unseen_element);
+                unseen.splice(unseen_index, 1)
+                args[index] = unseen_element; // pick an open elemnt
             }
         }
-        keep_idx = false;
-        let args = []
-        let argc = rules_dict[key]["args"]
-        argc = argc == -1 ? random(3,6) | 0 : argc;
-        let redo = false;
-        for (let word=0, lim = 0, seen = {}; word < argc; lim++) {
-            if(lim > 50) { redo = true; break; } 
-            let w = random(0, wordPool.length) | 0;
-            let n = wordPool[w]
-            if(n in seen) continue;
-            seen[n] = true;
-            args.push(n)
-            ++word
-        }
-        // Generation rules
-        ++tries;
-        if (redo) continue;
-        if(key == 'keylock') {
-            if(args[0] in keyLocations ||
-               (args[1] in lockLocations) && lockLocations[args[1]].indexOf(args[2]) != -1
-               ||
-               (args[0] == args[2] || args[0] == args[1] || args[1] == args[2])// Self-reference: key leads to key-room
-            ) {
-                --line; print("redo"); keep_idx = true; continue; }  // Duplicate Key Area
-            else {
-                keyLocations[args[0]] = true;
-                if(!lockLocations[args[1]]) lockLocations[args[1]] = []
-                lockLocations[args[1]].push(args[2])
+
+        // Fill in rest of slots
+        let err_no_more_options = false;
+        for(let index = 0; index < args.length; index++) {
+            if(!args[index])  {
+                let chosen_pool;
+                let chosen_index = 0;
+                let using_unseen = false;
+                if(closed.length != 0) {
+                    chosen_pool = closed;
+                    print("prolly using treasure")
+                }
+                else if (unseen.length != 0) {
+                    chosen_pool = unseen;
+                    using_unseen = true;
+                }
+                else { err_no_more_options = true; break; }
+                chosen_index = random(0, chosen_pool.length) | 0;
+                let tries = 0;
+                while(chosen_pool[chosen_index] in args) {
+                    chosen_index = random(0, chosen_pool.length) | 0;
+                    if(tries > 50) { err_no_more_options = true; break; }
+                    tries++;
+                }
+                let new_element = chosen_pool[chosen_index];
+                args[index] = new_element;  // if theres nothing in closed[], pick from unseen
+                if(using_unseen) {
+                    chosenUnseen.push(new_element);
+                    unseen.splice(chosen_index, 1);
+                }
             }
+        }
+        // add chosen open to other ehre
+        closed = closed.concat(chosenOpen);
+        for(let i = 0; i < chosenUnseen.length; i++) {
+            open.push(chosenUnseen[i]);
         }
 
         ret += rules_dict[key]["template"](args) + "\n"
+        // so now we have the args lol
+
+        if(err_no_more_options) { print("Could not build any more paths!"); return; }
+        tries++
     }
+    return ret 
+
+    // let idx;
+    // let keep_idx = false;
+    // let key;
+    // for(let line=0; line<amt; ++line) {
+    //     if (tries > 100) { print("ran out of tries"); return;}
+
+    //     if(!keep_idx){
+    //         idx = random(0, len) | 0;
+    //         for(let sum = 0, weight = 0; sum < weight_sum; idx = idx++ % (len)) {
+    //             key = keys[idx]
+    //             weight += rules_dict[key]["weight"]
+    //             if(weight > weight_sum) break;
+    //         }
+    //     }
+    //     keep_idx = false;
+    //     let args = []
+    //     let argc = rules_dict[key]["args"]
+    //     argc = argc == -1 ? random(3,6) | 0 : argc;
+    //     let redo = false;
+    //     for (let word=0, lim = 0, seen = {}; word < argc; lim++) {
+    //         if(lim > 50) { redo = true; break; } 
+    //         let w = random(0, wordPool.length) | 0;
+    //         let n = wordPool[w]
+    //         if(n in seen) continue;
+    //         seen[n] = true;
+    //         args.push(n)
+    //         ++word
+    //     }
+    //     // Generation rules
+    //     ++tries;
+    //     if (redo) continue;
+    //     if(key == 'keylock') {
+    //         if(args[0] in keyLocations ||
+    //            (args[1] in lockLocations) && lockLocations[args[1]].indexOf(args[2]) != -1
+    //            ||
+    //            (args[0] == args[2] || args[0] == args[1] || args[1] == args[2])// Self-reference: key leads to key-room
+    //         ) {
+    //             --line; print("redo"); keep_idx = true; continue; }  // Duplicate Key Area
+    //         else {
+    //             keyLocations[args[0]] = true;
+    //             if(!lockLocations[args[1]]) lockLocations[args[1]] = []
+    //             lockLocations[args[1]].push(args[2])
+    //         }
+    //     }
+
+    //     ret += rules_dict[key]["template"](args) + "\n"
+    // }
     return ret;
 }
 
@@ -236,6 +328,7 @@ function keylock(line) {
         // lockedEdges[n[1][0]].push([n[2][0], n[0][0]]);
 
         addEdge(social_edges, n[0][0], n[1][0], n[0][1]);
+        // addEdge(social_edges, n[1][0], n[0][0], n[0][1]);
         addEdge(social_edges, n[1][0], n[2][0], n[1][1]); // make this one transparent ofr now
 
         let trio = [n[0][0],n[1][0],n[2][0]];
