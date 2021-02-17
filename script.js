@@ -283,22 +283,46 @@ function removeEdge(dict, src, dst) {
 }
 
 function addEdge(dict, src, dst, label) {
+    // WRITE AN ENTRY FOR THE SRC
     if(!dict[src]) {  // CHECk IF DICT KEY-VAL PAIR IS OPEN
         dict[src] = {  
             dst: [dst],
             label: [label],
-            keylock_partners: []
+            keylock_partners: [],
+            came_froms: [],
+            going_tos: [dst]
         };
     }
     else { 
         let idx = dict[src]["dst"].indexOf(dst)
-        if (idx == -1) { // PREVENT DUPLICATE EDGES, ALLOW REWRITES
+        if (idx == -1) { // PREVENT DUPLICATE EDGES, ALLOW REWRITES OF EDGE TO A NODE
             dict[src]["dst"].push(dst) ;
             dict[src]["label"].push(label);
         }
-        else {
+        else { // REWRITE
             dict[src]["dst"][idx] = dst;
             dict[src]["label"][idx] = label;
+        }
+    }
+
+    // WRITE AN ENTRY FOR THE DST
+    if(!dict[dst]) {  
+        dict[dst] = {  
+            dst: [],
+            label: [label],
+            keylock_partners: [],
+            came_froms: [src],
+        };
+    }
+    else { 
+        let idx = dict[dst]["came_froms"].indexOf(src)
+        if (idx == -1) { // PREVENT DUPLICATE EDGES, ALLOW REWRITES OF EDGE TO A NODE
+            dict[dst]["came_froms"].push(dst) ;
+            dict[dst]["label"].push(label);
+        }
+        else { // REWRITE
+            dict[dst]["came_froms"][idx] = dst;
+            dict[dst]["label"][idx] = label;
         }
     }
 }
@@ -373,13 +397,6 @@ function render() {
     // RESETTI
     social_edges = {}
     dot_fragments = []
-    for (let prop in keyLocks) {
-        delete keyLocks[prop];
-    }
-    // for (let prop in lockedEdges) {
-    //     delete lockedEdges[prop];
-    // }
-
     // hpccWasm.graphvizSync().then(graphviz => {
     //     const div = document.getElementById("placeholder2");
     //     // Synchronous call to layout
