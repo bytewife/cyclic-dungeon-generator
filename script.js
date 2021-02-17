@@ -1,4 +1,6 @@
 // TODO
+// add a generate random button
+// prevent self referenc on cycles
 // rule weights
 // - get a training set of data to put into words
 // 
@@ -78,7 +80,7 @@ let lockedEdges = {}; // key: door area, value: [locked area, key area]
 let social_edges = {};  // Looks like { srcname: {dst:[...], label: [...]}, ... }
 
 function setup() {
-    reseed();
+    // reseed();
     numCols = select("#asciiBox").attribute("rows") | 0; // iot grab html element named asciiBox.
     numRows = select("#asciiBox").attribute("cols") | 0; // 'select()' grabs an html element
     // select("#reseedButton").mousePressed(reseed);
@@ -89,13 +91,13 @@ function setup() {
 }
 
 function reseed() {
-    seed = (seed | 0) + 1109;
+    seed = (seed | 0);
     noiseSeed(seed);
     randomSeed(seed);
     select("#seedReport").html("seed " + seed);
 }
 
-let sampleText = '\
+let inputText = '\
 Hero -> Village : Sidle back\n\
 Dragon -> Treasure : Guards\n\
 cycle(Hero, Cave, Dragon, Basement)\n\
@@ -106,8 +108,8 @@ function fillGrid(
     text = ""
 ) {
     //sum weights
-    sampleText = generateText(3);
-    select("#asciiBox").value(text = sampleText);
+    inputText = generateText(3);
+    select("#asciiBox").value(text = inputText);
     text_lines.push(text)
 }
 
@@ -128,7 +130,6 @@ function generateDot(line) {
 
 let wordPool = ["a", "b", "c", "d"]
 function generateText(amt) {
-    noiseSeed(1)
     let ret = '';
     let keys = Object.keys(rules_dict);
     let len = keys.length
@@ -140,13 +141,24 @@ function generateText(amt) {
     for (rule in rules_dict) {
         weight_sum += rules_dict[rule]["weight"];
     }
-    print(weight_sum)
 
+    let idx;
+    let keep_idx = false;
+    let key;
     for(let line=0; line<amt; ++line) {
         if (tries > 100) return;
-        let idx = random(0, len) | 0;
-        idx = 2
-        let key = keys[idx]
+
+        if(!keep_idx){
+            idx = random(0, len) | 0;
+            for(let sum = 0, weight = 0; sum < weight_sum; idx = idx++ % (len)) {
+                // print(idx)
+                key = keys[idx]
+                print(key)
+                weight += rules_dict[key]["weight"]
+                if(weight > weight_sum) break;
+            }
+        }
+        keep_idx = false;
         let args = []
         let argc = rules_dict[key]["args"]
         argc = argc == -1 ? random(3,6) | 0 : argc;
@@ -159,8 +171,10 @@ function generateText(amt) {
         if(key == 'keylock') {
             if(args[0] in keyLocations ||
                (args[1] in lockLocations) && lockLocations[args[1]].indexOf(args[2]) != -1
+               ||
+               (args[0] == args[2])// Self-reference: key leads to key-room
             ) {
-                --line; print("redo"); continue; }  // Duplicate Key Area
+                --line; print("redo"); keep_idx = true; continue; }  // Duplicate Key Area
             else {
                 keyLocations[args[0]] = true;
                 if(!lockLocations[args[1]]) lockLocations[args[1]] = []
