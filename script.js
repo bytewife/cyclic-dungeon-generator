@@ -1,4 +1,5 @@
 // TODO
+// clean up rules
 // - Figure out how to store the generation rules. Adjacency List? How to get past issue of the key room being unreachable- I think you need to make it so that each rule has one node that's in-use (like a hook)
 // - add generation rule of every generation needs a start, and a goal
 // 
@@ -75,7 +76,7 @@ let rules_dict = {
 let keyLocks = {}     // key: key area, value: [door area, locked area]
 let lockedEdges = {}; // key: door area, value: [locked area, key area]
 
-let social_edges = {};  // Looks like { srcname: {dst:[...], label: [...]}, ... }
+let social_edges = {};  // Looks like { srcname: {dst:[...], label: [...]}, keylock_partners: [key, start, end], cameFroms, goingTos }
 
 function setup() {
     // reseed();
@@ -226,15 +227,27 @@ function keylock(line) {
     n[1] = parseParamBody(n[1])
     n[2] = parseParamTail(n[2])
     if (!n.includes("")) {
-        if(!keyLocks[n[0][0]]) keyLocks[n[0][0]] = []
-        keyLocks[n[0][0]].push([n[1][0], n[2][0]])
+        // if(!keyLocks[n[0][0]]) keyLocks[n[0][0]] = []
+        // keyLocks[n[0][0]].push([n[1][0], n[2][0]])
 
-        if(!lockedEdges[n[1][0]]) lockedEdges[n[1][0]] = []
-        // lockedEdges[n[1][0]].push([n[2][0]]);
-        lockedEdges[n[1][0]].push([n[2][0], n[0][0]]);
+
+        // if(!lockedEdges[n[1][0]]) lockedEdges[n[1][0]] = []
+        // // lockedEdges[n[1][0]].push([n[2][0]]);
+        // lockedEdges[n[1][0]].push([n[2][0], n[0][0]]);
 
         addEdge(social_edges, n[0][0], n[1][0], n[0][1]);
         addEdge(social_edges, n[1][0], n[2][0], n[1][1]); // make this one transparent ofr now
+
+        let trio = [n[0][0],n[1][0],n[2][0]];
+        let n0t = social_edges[ n[0][0] ]["keylock_partners"];
+        n0t.push(trio)
+
+        let n1t = social_edges[ n[1][0] ]["keylock_partners"];
+        n1t.push(trio)
+
+        // for now lets not let the exit know
+        // let n2t = social_edges[ n[2][0] ]["keylock_partners"];
+        // n2t.push(trio)
     }
 }
 
@@ -273,7 +286,8 @@ function addEdge(dict, src, dst, label) {
     if(!dict[src]) {  // CHECk IF DICT KEY-VAL PAIR IS OPEN
         dict[src] = {  
             dst: [dst],
-            label: [label]
+            label: [label],
+            keylock_partners: []
         };
     }
     else { 
@@ -315,22 +329,32 @@ function render() {
             let dst = social_edges[src]["dst"][edge]
             let edgecol = ""
             let keycol = ""
-
             let label = social_edges[src]["label"][edge]
-
-            let ks = ''; if (src in keyLocks) { ks = keyUni; keycol = hashStringToColor(src); }  // If this src has a key
-            let kd = ''; if (dst in keyLocks) { kd = keyUni; }  // just adds key character to pointed-to node
-
-            let sty = ""
-            if (src in lockedEdges) { // If this edge is a key-lock edge
-                for(let a=0; a<lockedEdges[src].length; a++) {  // search through each lock edge using as a door
-                    if(lockedEdges[src][a][0] == dst) {
-                        sty = "dashed"; edgecol = hashStringToColor(lockedEdges[src][a][1]);  // hash the key location
-                        break;
+            let sty = ''
+            
+            // KEYS
+            let ks = ''; 
+            for(let i = 0; i < social_edges[src]["keylock_partners"].length; i++) {  // check if source has a key
+                let trio = social_edges[src]["keylock_partners"][i];
+                if(trio[0] == src) {  // check if src is key holder
+                    ks = keyUni; keycol = hashStringToColor(src);
+                }
+                if (trio[1] == src && trio[2] == dst) {  // check if any of them have the dst as the end of the keylock and src as the entrance
+                    sty = "dashed";
+                    edgecol = hashStringToColor(social_edges[src]["keylock_partners"][i][0]);  // hash the key location
+                    break;
+                }
+            }
+            let kd = '';  // just adds key character to pointed-to node
+            if(social_edges[dst]){  // this is because destinations arent yet given trios in AddEdge
+                for(let i = 0; i < social_edges[dst]["keylock_partners"].length; i++) {  
+                    if(social_edges[dst]["keylock_partners"][i][0] == dst) {  // right?
+                        kd = keyUni; 
                     }
                 }
             }
 
+            // CONVERT TO DOT
             dot_fragments.push(` "${ks}${src}" -> "${kd}${dst}" [label="${label}" style="${sty}" color="${edgecol}"]`);
             if (ks != '') {
                 dot_fragments.push(` "${ks}${src}" [ fillcolor="${keycol}"   style=filled]`);  // Changes node color if it contains key
@@ -352,9 +376,9 @@ function render() {
     for (let prop in keyLocks) {
         delete keyLocks[prop];
     }
-    for (let prop in lockedEdges) {
-        delete lockedEdges[prop];
-    }
+    // for (let prop in lockedEdges) {
+    //     delete lockedEdges[prop];
+    // }
 
     // hpccWasm.graphvizSync().then(graphviz => {
     //     const div = document.getElementById("placeholder2");
