@@ -1,6 +1,5 @@
 // TODO
-// Add a key mechanism (in the label or other)
-// Add more modular key-adding structure that uses a dict to store rule regexs with the functions
+// Variable cycle num
 // https://renenyffenegger.ch/notes/index.html
 
 // Graphviz tools https://renenyffenegger.ch/notes/tools/Graphviz/examples/index
@@ -9,12 +8,34 @@ let seed;
 let dot;
 let dot_fragments = [];
 let text_lines = [];
-let arrow = '->'
-let regex_alphanum = /^[A-Za-z0-9]+$/
+// let alphanum = /^[A-Za-z0-9]+$/
+let alphanum = /[^0-9A-Za-z ]/  // actually this is non alphanum
 
-let cycleRule = /cycle\((.*?),(.*?),(.*?),(.*?)\)/  // cycle(,,,,) with no white spaces for params
-let lockKeyRule = /keylock\((.*?),(.*?),(.*?)\)/    // keylock(keylocation, start, end)
-let tweenRule = /insert\((.*?),(.*?),(.*?)\)/        // tween(start, middle, end)
+let rules_names = ["cycle", "lockkey", "wedge"]
+
+let rules_dict = {
+    arrow: {
+        regex: /->/,
+        count: 2,
+        function: arrow
+        
+    },
+    cycle: {
+        regex: /cycle\((.*?),(.*?),(.*?),(.*?)\)/,
+        count: 4,
+        function: cycle // cycle(,,,,) with no white spaces for params
+    },
+    keylock: {
+        regex: /keylock\((.*?),(.*?),(.*?)\)/,
+        count: 3,
+        function: keylock // keylock(keylocation, start, end)
+    },
+    wedge: {
+        regex: /wedge\((.*?),(.*?),(.*?)\)/,
+        count: 3,
+        function: wedge  // tween(start, middle, end)
+    }
+}
 
 let keyLocks = {}     // key: key area, value: [door area, locked area]
 let lockedEdges = {}; // key: door area, value: [locked area, key area]
@@ -41,7 +62,8 @@ let sampleText = '\
 Hero -> Village : Sidle back\n\
 Dragon -> Treasure : Guards\n\
 cycle(Hero, Cave, Dragon, Basement)\n\
-keylock(Basement, Hero, Treasure)\ninsert(Hero, Rival Encounter, Cave)\
+keylock(Basement, Hero, Treasure)\n\
+wedge(Hero:Duels, Rival, Cave)\
 ';
 function fillGrid(
     text = ""
@@ -57,9 +79,8 @@ function parseTextForm() {
 }
 
 function checkIsArrow(line) {
-    let re = new RegExp(arrow)
-    if (re.test(line)) {
-        let lenCheckArr = line.split(arrow)
+    if (/->/.test(line)) {
+        let lenCheckArr = line.split("->")
         return lenCheckArr[0].trim() != "" && lenCheckArr[1].trim() != ""
     }
 }
@@ -70,61 +91,71 @@ function splitByNewline(str) {
 }
 
 function generateDot(line) {
-    let src, dst, label = "";
-    if (line && line[0] == '#') return;
-    if (checkIsArrow(line)) {
-        // GET SRC & DST (->)
-        let arr = (line.split(arrow, 2))
-        arr[0] = arr[0].replace(/[^0-9A-Za-z ]/, '').trim() ;  // remove non alphanumeric
-        arr[1] = arr[1].split(':', 1)[0].replace(/[^0-9A-Za-z ]/, '').trim();  // surroundig quotes for multi word
-        // GET LABEL (:)
-        if (/:/.test(line)) {
-            label = " " + line.split(':', 2)[1].trim();
-        }
-        src = arr[0], dst = arr[1];
-        addEdge(social_edges, src, dst, label);
-    }
-    else if (cycleRule.test(line)) {
-        let c = 4;
-        let n = line.split(',',c)
-        n[0] = parseParamHead(n[0]);
-        n[1] = parseParamBody(n[1]);
-        n[2] = parseParamBody(n[2]);
-        n[3] = parseParamTail(n[3]);
-        if (!n.includes("")) {
-            for(let src = 0; src < c; ++src) {
-                addEdge(social_edges, n[src][0], n[(src+1) % 4][0], n[src][1]);
-            }
+    if (line && line[0] == '#') return; // TODO split line by # instead
+    for(const [tag, details] of Object.entries(rules_dict)) {
+        if(details["regex"].test(line)) {
+            details["function"](line);
         }
     }
-    else if (lockKeyRule.test(line)) {
-        let c = 3;
-        let n = line.split(',',c)
-        n[0] = parseParamHead(n[0])
-        n[1] = parseParamBody(n[1])
-        n[2] = parseParamTail(n[2])
-        if (!n.includes("")) {
-            keyLocks[n[0][0]] = [n[1][0], n[2][0]]
-            lockedEdges[n[1][0]] = [n[2][0], n[0][0]];
-            addEdge(social_edges, n[0][0], n[1][0], n[0][1]);
-            addEdge(social_edges, n[1][0], n[2][0], n[1][1]); // make this one transparent ofr now
-        }
-    }
-    else if (tweenRule.test(line)) {
-        let c = 3;
-        let n = line.split(',',c)
-        n[0] = parseParamHead(n[0])
-        n[1] = parseParamBody(n[1])
-        n[2] = parseParamTail(n[2])
+}
 
-        let start = n[0][0]
-        let end = n[2][0]
-        removeEdge(social_edges, start, end)
-        let middle = n[1][0]
-        if (!n.includes("")) {
-            addEdge(social_edges, start, middle, n[0][1]);
-            addEdge(social_edges, middle, end, n[1][1]); // make this one transparent ofr now
+function arrow(line) {
+    let src, dst, label = ""
+    let arr = (line.split("->", 2))
+    if(arr[0].trim() == "" || arr[1].trim() == "") return;
+    arr[0] = arr[0].replace(alphanum, '').trim() ;  // remove non alphanumeric
+    arr[1] = arr[1].split(':', 1)[0].replace(alphanum, '').trim();  // surroundig quotes for multi word
+    if (/:/.test(line)) {
+        label = " " + line.split(':', 2)[1].trim();
+    }
+    src = arr[0], dst = arr[1];
+    print(label)
+    addEdge(social_edges, src, dst, label);
+}
+
+function cycle(line) {
+    // TODO variable number
+    let c = 4;
+    let n = line.split(',',c)
+    n[0] = parseParamHead(n[0]);
+    n[1] = parseParamBody(n[1]);
+    n[2] = parseParamBody(n[2]);
+    n[3] = parseParamTail(n[3]);
+    if (!n.includes("")) {
+        for(let src = 0; src < c; ++src) {
+            addEdge(social_edges, n[src][0], n[(src+1) % 4][0], n[src][1]);
         }
+    }
+}
+
+function keylock(line) {
+    let c = 3;
+    let n = line.split(',',c)
+    n[0] = parseParamHead(n[0])
+    n[1] = parseParamBody(n[1])
+    n[2] = parseParamTail(n[2])
+    if (!n.includes("")) {
+        keyLocks[n[0][0]] = [n[1][0], n[2][0]]
+        lockedEdges[n[1][0]] = [n[2][0], n[0][0]];
+        addEdge(social_edges, n[0][0], n[1][0], n[0][1]);
+        addEdge(social_edges, n[1][0], n[2][0], n[1][1]); // make this one transparent ofr now
+    }
+}
+
+function wedge(line) {
+    let c = 3;
+    let n = line.split(',',c)
+    n[0] = parseParamHead(n[0])
+    n[1] = parseParamBody(n[1])
+    n[2] = parseParamTail(n[2])
+
+    let start = n[0][0]
+    let end = n[2][0]
+    removeEdge(social_edges, start, end)
+    let middle = n[1][0]
+    if (!n.includes("")) {
+        addEdge(social_edges, start, middle, n[0][1]);
+        addEdge(social_edges, middle, end, n[1][1]); // make this one transparent ofr now
     }
 }
 
@@ -163,7 +194,7 @@ function addEdge(dict, src, dst, label) {
 
 // These parse functions return n, where n[0] is the node name and n[1] is the label/verb
 function parseParamHead(n) {
-    n = n.substring(n.lastIndexOf('('), n.length).replace(/[^0-9A-Za-z ]/, '').split(':', 2);
+    n = n.substring(n.lastIndexOf('('), n.length).replace(alphanum, '').split(':', 2);
     if (!n[1]) n[1] = ""
     return [n[0].trim(), n[1].trim()];
 }
@@ -171,11 +202,11 @@ function parseParamHead(n) {
 function parseParamBody(n) {
     n = n.split(':', 2);
     if (!n[1]) n[1] = ""
-    return [n[0].replace(/[^0-9A-Za-z ]/, '').trim(), n[1].replace(/[^0-9A-Za-z ]/, '').trim()];
+    return [n[0].replace(alphanum, '').trim(), n[1].replace(alphanum, '').trim()];
 }
 
 function parseParamTail(n) {
-    n = n.substring(0, n.indexOf(')')).replace(/[^0-9A-Za-z ]/, '').split(':', 2);
+    n = n.substring(0, n.indexOf(')')).replace(alphanum, '').split(':', 2);
     if (!n[1]) n[1] = ""
     return [n[0].trim(), n[1].trim()];
 }
@@ -195,11 +226,11 @@ function render() {
 
             let sty = ""
             if (src in lockedEdges && dst == lockedEdges[src][0])  // If this edge is a key-lock edge
-                { sty = "dashed"; edgecol = hashStringToColor(lockedEdges[src][1]);}
+                { sty = "dashed"; edgecol = hashStringToColor(lockedEdges[src][1]); }
 
             dot_fragments.push(` "${ks}${src}" -> "${kd}${dst}" [label="${label}" style="${sty}" color="#${edgecol}"]`);
             if (ks != '') {
-                dot_fragments.push(` "${ks}${src}" [ fillcolor="#${keycol}"   style=filled                  ]`);
+                dot_fragments.push(` "${ks}${src}" [ fillcolor="#${keycol}"   style=filled]`);  // Changes node color if it contains key
             }
         }
     }
@@ -228,6 +259,8 @@ function render() {
     //     div.innerHTML = graphviz.layout(dot, "svg", "dot");
     // });
 }
+
+
 
 // For converting string to color https://stackoverflow.com/questions/3426404/create-a-hexadecimal-colour-based-on-a-string-with-javascript
 function hashStringToColor(str) { 
