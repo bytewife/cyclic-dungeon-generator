@@ -1,8 +1,6 @@
 // TODO
-// add a generate random button
-// prevent self referenc on cycles
-// rule weights
-// - get a training set of data to put into words
+// - Figure out how to store the generation rules. Adjacency List? How to get past issue of the key room being unreachable- I think you need to make it so that each rule has one node that's in-use (like a hook)
+// - add generation rule of every generation needs a start, and a goal
 // 
 // https://renenyffenegger.ch/notes/index.html
 
@@ -83,18 +81,21 @@ function setup() {
     // reseed();
     numCols = select("#asciiBox").attribute("rows") | 0; // iot grab html element named asciiBox.
     numRows = select("#asciiBox").attribute("cols") | 0; // 'select()' grabs an html element
-    // select("#reseedButton").mousePressed(reseed);
+    select("#reseedButton").mousePressed(reseed);
     select("#asciiBox").input(parseTextForm);
-    fillGrid();
+    fillTextForm();
     parseTextForm()
     
 }
 
 function reseed() {
-    seed = (seed | 0);
+    seed = random(seed) + random(600, 1109);
     noiseSeed(seed);
     randomSeed(seed);
-    select("#seedReport").html("seed " + seed);
+    select("#seedReport").html(" seed: " + seed);
+    inputText = generateText(4);
+    fillTextForm();
+    parseTextForm();
 }
 
 let inputText = '\
@@ -104,13 +105,10 @@ cycle(Hero, Cave, Dragon, Basement)\n\
 keylock(Basement, Hero, Treasure)\n\
 wedge(Hero:Duels, Rival, Cave)\
 ';
-function fillGrid(
+function fillTextForm(
     text = ""
 ) {
-    //sum weights
-    inputText = generateText(3);
     select("#asciiBox").value(text = inputText);
-    text_lines.push(text)
 }
 
 function parseTextForm() {
@@ -128,7 +126,7 @@ function generateDot(line) {
     }
 }
 
-let wordPool = ["a", "b", "c", "d"]
+let wordPool = ["Cave", "Home", "Dark Castle", "Woods", "River", "Treasure"]
 function generateText(amt) {
     let ret = '';
     let keys = Object.keys(rules_dict);
@@ -146,14 +144,12 @@ function generateText(amt) {
     let keep_idx = false;
     let key;
     for(let line=0; line<amt; ++line) {
-        if (tries > 100) return;
+        if (tries > 100) { print("ran out of tries"); return;}
 
         if(!keep_idx){
             idx = random(0, len) | 0;
             for(let sum = 0, weight = 0; sum < weight_sum; idx = idx++ % (len)) {
-                // print(idx)
                 key = keys[idx]
-                print(key)
                 weight += rules_dict[key]["weight"]
                 if(weight > weight_sum) break;
             }
@@ -162,17 +158,24 @@ function generateText(amt) {
         let args = []
         let argc = rules_dict[key]["args"]
         argc = argc == -1 ? random(3,6) | 0 : argc;
-        for (let word=0; word < argc; ++word) {
+        let redo = false;
+        for (let word=0, lim = 0, seen = {}; word < argc; lim++) {
+            if(lim > 50) { redo = true; break; } 
             let w = random(0, wordPool.length) | 0;
-            args.push(wordPool[w])
+            let n = wordPool[w]
+            if(n in seen) continue;
+            seen[n] = true;
+            args.push(n)
+            ++word
         }
         // Generation rules
         ++tries;
+        if (redo) continue;
         if(key == 'keylock') {
             if(args[0] in keyLocations ||
                (args[1] in lockLocations) && lockLocations[args[1]].indexOf(args[2]) != -1
                ||
-               (args[0] == args[2])// Self-reference: key leads to key-room
+               (args[0] == args[2] || args[0] == args[1] || args[1] == args[2])// Self-reference: key leads to key-room
             ) {
                 --line; print("redo"); keep_idx = true; continue; }  // Duplicate Key Area
             else {
