@@ -59,8 +59,8 @@ let rules_dict = {
             return ret;
         },
         weight: 20,
-        insert_open_pos: [0],
-        unseen_to_open_pos: [1]
+        insert_open_pos: [1],
+        unseen_to_open_pos: [0]
     },
     wedge: {
         regex: /wedge\((.*?),(.*?),(.*?)\)/,  // wedge(start, middle, end)
@@ -169,7 +169,7 @@ function generateText(amt) {
 
         // Fill the non-terminals
         let chosenOpen = []
-        for(index in rules_dict[key]["insert_open_pos"]) {
+        for(index of rules_dict[key]["insert_open_pos"]) {
             let open_element = open.shift()
             args[index] = open_element; // pick an open elemnt
             chosenOpen.push(open_element)
@@ -181,7 +181,6 @@ function generateText(amt) {
             if(unseen.length > 0){
                 let unseen_index = random(0, unseen.length) | 0;
                 let unseen_element = unseen[unseen_index]
-                print("unseen element is "+unseen_element)
                 chosenUnseen.push(unseen_element);
                 unseen.splice(unseen_index, 1)
                 args[index] = unseen_element; // pick an open elemnt
@@ -197,7 +196,6 @@ function generateText(amt) {
                 let using_unseen = false;
                 if(closed.length != 0) {
                     chosen_pool = closed;
-                    print("prolly using treasure")
                 }
                 else if (unseen.length != 0) {
                     chosen_pool = unseen;
