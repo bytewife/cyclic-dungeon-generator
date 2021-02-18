@@ -1,5 +1,7 @@
 // TODO
 // clean up rules
+// - fix regen button
+// - add a changeable "max keylocks"
 // - graph traversal until homa can be reached
 // - add generation rule of every generation needs a start, and a goal
 // - how can I write a grammar that's cleaner?
@@ -87,6 +89,11 @@ let lockedEdges = {}; // key: door area, value: [locked area, key area]
 
 let social_edges = {};  // Looks like { srcname: {dst:[...], label: [...]}, keylock_partners: [key, start, end], cameFroms, goingTos }
 
+
+let wordPool = []; //= ["Cave", "Dark Castle", "Woods", "River", "Forest", "Volcano"]
+let open = []; //= ["Home"]
+let unseen = []; // = wordPool.filter(function(x) { return open.indexOf(x) < 0 })  // not fast but its readable
+let closed; // = ["Treasure"]
 function setup() {
     // reseed();
     numCols = select("#asciiBox").attribute("rows") | 0; // iot grab html element named asciiBox.
@@ -95,30 +102,49 @@ function setup() {
     select("#asciiBox").input(parseTextForm);
     fillTextForm();
     parseTextForm()
-    
 }
 
 function reseed() {
-    seed = random(seed) + random(600, 1109);
+    // open = 
+    seed = random(seed) + random(600, 1111);
     noiseSeed(seed);
     randomSeed(seed);
     select("#seedReport").html(" seed: " + seed);
+    open = parseBox("startBox")
+    unseen = parseBox("middleBox")
+    closed = parseBox("endBox")
     inputText = generateText(4);
     fillTextForm();
     parseTextForm();
 }
 
+function parseBox(box_name) {
+    let lines = select("#"+box_name).value();
+    print(lines)
+    lines = lines.split('\n');
+    if(!lines || lines[0] == '') {
+        if (box_name == "startBox") lines = placeHolderStart.split(', ');
+        else if (box_name == "middleBox") lines = placeHolderMid.split(', ');
+        else if (box_name == "endBox") lines = placeHolderEnd.split(', ');
+    }
+    return(lines)
+}
+
 let inputText = '\
 Hero -> Village : Sidle back\n\
 Dragon -> Treasure : Guards\n\
-cycle(Hero, Cave, Dragon, Basement)\n\
-keylock(Basement, Hero, Treasure)\n\
-wedge(Hero:Duels, Rival, Cave)\
-';
+cycle(Hero, Rival, Cave, Basement)\n\
+keylock(Basement, Cave, Dragon)\n\
+wedge(Hero:Duels, Rival, Cave)';
+
+let placeHolderStart = "Beginville"
+let placeHolderMid = "Middling Woods, Tweentown, Halfcliff, Mount Medium, Medial Mesa, Central Rock, Interisles, Betwixt Beaches, Mezzo Meadows, Withinwall, Straddleroad";
+let placeHolderEnd = "Endlands"
+
 function fillTextForm(
     text = ""
 ) {
-    inputText = generateText(4);  // DEBUG
+    // inputText = generateText(4);  // DEBUG
     select("#asciiBox").value(text = inputText);
 }
 
@@ -137,10 +163,6 @@ function generateDot(line) {
     }
 }
 
-let wordPool = ["Cave", "Dark Castle", "Woods", "River", "Forest", "Volcano"]
-let open = ["Home"]
-let unseen = wordPool.filter(function(x) { return open.indexOf(x) < 0 })  // not fast but its readable
-let closed = ["Treasure"]
 
 function generateText(amt) {
     let ret = '';
@@ -230,54 +252,6 @@ function generateText(amt) {
         tries++
     }
     return ret 
-
-    // let idx;
-    // let keep_idx = false;
-    // let key;
-    // for(let line=0; line<amt; ++line) {
-    //     if (tries > 100) { print("ran out of tries"); return;}
-
-    //     if(!keep_idx){
-    //         idx = random(0, len) | 0;
-    //         for(let sum = 0, weight = 0; sum < weight_sum; idx = idx++ % (len)) {
-    //             key = keys[idx]
-    //             weight += rules_dict[key]["weight"]
-    //             if(weight > weight_sum) break;
-    //         }
-    //     }
-    //     keep_idx = false;
-    //     let args = []
-    //     let argc = rules_dict[key]["args"]
-    //     argc = argc == -1 ? random(3,6) | 0 : argc;
-    //     let redo = false;
-    //     for (let word=0, lim = 0, seen = {}; word < argc; lim++) {
-    //         if(lim > 50) { redo = true; break; } 
-    //         let w = random(0, wordPool.length) | 0;
-    //         let n = wordPool[w]
-    //         if(n in seen) continue;
-    //         seen[n] = true;
-    //         args.push(n)
-    //         ++word
-    //     }
-    //     // Generation rules
-    //     ++tries;
-    //     if (redo) continue;
-    //     if(key == 'keylock') {
-    //         if(args[0] in keyLocations ||
-    //            (args[1] in lockLocations) && lockLocations[args[1]].indexOf(args[2]) != -1
-    //            ||
-    //            (args[0] == args[2] || args[0] == args[1] || args[1] == args[2])// Self-reference: key leads to key-room
-    //         ) {
-    //             --line; print("redo"); keep_idx = true; continue; }  // Duplicate Key Area
-    //         else {
-    //             keyLocations[args[0]] = true;
-    //             if(!lockLocations[args[1]]) lockLocations[args[1]] = []
-    //             lockLocations[args[1]].push(args[2])
-    //         }
-    //     }
-
-    //     ret += rules_dict[key]["template"](args) + "\n"
-    // }
     return ret;
 }
 
@@ -317,15 +291,6 @@ function keylock(line) {
     n[1] = parseParamBody(n[1])
     n[2] = parseParamTail(n[2])
     if (!n.includes("")) {
-        // if(!keyLocks[n[0][0]]) keyLocks[n[0][0]] = []
-        // keyLocks[n[0][0]].push([n[1][0], n[2][0]])
-
-
-        // if(!lockedEdges[n[1][0]]) lockedEdges[n[1][0]] = []
-        // // lockedEdges[n[1][0]].push([n[2][0]]);
-        // lockedEdges[n[1][0]].push([n[2][0], n[0][0]]);
-
-        // addEdge(social_edges, n[0][0], n[1][0], n[0][1]);
         addEdge(social_edges, n[1][0], n[0][0], n[0][1]);
         addEdge(social_edges, n[1][0], n[2][0], n[1][1]); // make this one transparent ofr now
 
@@ -336,9 +301,8 @@ function keylock(line) {
         let n1t = social_edges[ n[1][0] ]["keylock_partners"];
         n1t.push(trio)
 
-        // for now lets not let the exit know
-        // let n2t = social_edges[ n[2][0] ]["keylock_partners"];
-        // n2t.push(trio)
+        let n2t = social_edges[ n[2][0] ]["keylock_partners"];
+        n2t.push(trio)
     }
 }
 
@@ -452,10 +416,8 @@ function render() {
             let kd = '';  // just adds key character to pointed-to node
             for(let i = 0; i < social_edges[src]["keylock_partners"].length; i++) {  // check if source has a key
                 let trio = social_edges[src]["keylock_partners"][i];
-                print(src); print(social_edges[src]["keylock_partners"]);
                 if(trio[0] == src) {  // check if src is key holder
                     ks = keyUni; 
-                    print("found")
                     // break;
                 }
                 if (trio[1] == src && trio[2] == dst) {  // check if any of them have the dst as the end of the keylock and src as the entrance
