@@ -137,8 +137,8 @@ function generateDot(line) {
     }
 }
 
-let wordPool = ["Cave", "Home", "Dark Castle", "Woods", "River", "Forest", "Volcano"]
-let open = ["Cave"]
+let wordPool = ["Cave", "Dark Castle", "Woods", "River", "Forest", "Volcano"]
+let open = ["Home"]
 let unseen = wordPool.filter(function(x) { return open.indexOf(x) < 0 })  // not fast but its readable
 let closed = ["Treasure"]
 
@@ -327,8 +327,8 @@ function keylock(line) {
         // // lockedEdges[n[1][0]].push([n[2][0]]);
         // lockedEdges[n[1][0]].push([n[2][0], n[0][0]]);
 
-        addEdge(social_edges, n[0][0], n[1][0], n[0][1]);
-        // addEdge(social_edges, n[1][0], n[0][0], n[0][1]);
+        // addEdge(social_edges, n[0][0], n[1][0], n[0][1]);
+        addEdge(social_edges, n[1][0], n[0][0], n[0][1]);
         addEdge(social_edges, n[1][0], n[2][0], n[1][1]); // make this one transparent ofr now
 
         let trio = [n[0][0],n[1][0],n[2][0]];
@@ -350,6 +350,7 @@ function wedge(line) {
     n[0] = parseParamHead(n[0])
     n[1] = parseParamBody(n[1])
     n[2] = parseParamTail(n[2])
+    // TODO check if a lockdoor edge exists between 0 and 2, and transfer it to 1 and 2. however, you'll have to update the key's trio as well
 
     let start = n[0][0]
     let end = n[2][0]
@@ -371,7 +372,6 @@ function removeEdge(dict, src, dst) {
         let label_arr = dict_val["label"]
         label_arr.splice(idx, 1);
         if(lookup_arr.length < 1) delete dict_val
-        // TODO remove from keyLocks
     } 
 }
 
@@ -451,30 +451,33 @@ function render() {
             
             // KEYS
             let ks = ''; 
+            let kd = '';  // just adds key character to pointed-to node
             for(let i = 0; i < social_edges[src]["keylock_partners"].length; i++) {  // check if source has a key
                 let trio = social_edges[src]["keylock_partners"][i];
+                print(src); print(social_edges[src]["keylock_partners"]);
                 if(trio[0] == src) {  // check if src is key holder
-                    ks = keyUni; keycol = hashStringToColor(src);
+                    ks = keyUni; 
+                    print("found")
+                    // break;
                 }
                 if (trio[1] == src && trio[2] == dst) {  // check if any of them have the dst as the end of the keylock and src as the entrance
                     sty = "dashed";
                     edgecol = hashStringToColor(social_edges[src]["keylock_partners"][i][0]);  // hash the key location
-                    break;
+                    // break;
                 }
             }
-            let kd = '';  // just adds key character to pointed-to node
             if(social_edges[dst]){  // this is because destinations arent yet given trios in AddEdge
                 for(let i = 0; i < social_edges[dst]["keylock_partners"].length; i++) {  
                     if(social_edges[dst]["keylock_partners"][i][0] == dst) {  // right?
-                        kd = keyUni; 
+                        kd = keyUni; keycol = hashStringToColor(dst);
                     }
                 }
             }
 
             // CONVERT TO DOT
             dot_fragments.push(` "${ks}${src}" -> "${kd}${dst}" [label="${label}" style="${sty}" color="${edgecol}"]`);
-            if (ks != '') {
-                dot_fragments.push(` "${ks}${src}" [ fillcolor="${keycol}"   style=filled]`);  // Changes node color if it contains key
+            if (kd != '') {
+                dot_fragments.push(` "${kd}${dst}" [ fillcolor="${keycol}"   style=filled]`);  // Changes node color if it contains key
             }
         }
     }
