@@ -23,7 +23,7 @@ let rules_dict = {
         args: 2,
         function: arrow,
         template: (arr) => { return `${arr[0]} -> ${arr[1]}`; },
-        weight: 40,
+        weight: 30,
         insert_open_pos: [0],
         unseen_to_open_pos: [1]
     },
