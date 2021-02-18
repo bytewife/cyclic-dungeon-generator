@@ -99,13 +99,13 @@ function setup() {
     numCols = select("#asciiBox").attribute("rows") | 0; // iot grab html element named asciiBox.
     numRows = select("#asciiBox").attribute("cols") | 0; // 'select()' grabs an html element
     select("#reseedButton").mousePressed(reseed);
+    select("#appendButton").mousePressed(appendText);
     select("#asciiBox").input(parseTextForm);
     fillTextForm();
     parseTextForm()
 }
 
 function reseed() {
-    // open = 
     seed = random(seed) + random(600, 1111);
     noiseSeed(seed);
     randomSeed(seed);
@@ -114,6 +114,13 @@ function reseed() {
     unseen = parseBox("middleBox")
     closed = parseBox("endBox")
     inputText = generateText(4);
+    fillTextForm();
+    parseTextForm();
+}
+
+function appendText() {
+    inputText = inputText.concat(generateText(1))
+    print(inputText)
     fillTextForm();
     parseTextForm();
 }
@@ -144,7 +151,6 @@ let placeHolderEnd = "Endlands"
 function fillTextForm(
     text = ""
 ) {
-    // inputText = generateText(4);  // DEBUG
     select("#asciiBox").value(text = inputText);
 }
 
@@ -251,7 +257,6 @@ function generateText(amt) {
         if(err_no_more_options) { print("Could not build any more paths!"); return; }
         tries++
     }
-    return ret 
     return ret;
 }
 
